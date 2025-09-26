@@ -1,4 +1,4 @@
-// Thunderproof - Enhanced JavaScript with Real Nostr Reviews
+// Thunderproof - Fixed JavaScript for Current Setup
 class ThunderproofApp {
     constructor() {
         // Application state
@@ -136,7 +136,7 @@ class ThunderproofApp {
             });
         });
 
-        // Connect options (removed generate keys)
+        // Connect options
         document.getElementById('connect-extension')?.addEventListener('click', () => this.connectExtension());
         document.getElementById('connect-key')?.addEventListener('click', () => this.showNsecInput());
     }
@@ -488,7 +488,7 @@ class ThunderproofApp {
                 <div class="review-header">
                     <div class="review-meta">
                         <div class="review-rating">
-                            <img src="assets/${this.getRatingAsset(review.rating)}.svg" alt="${review.rating} stars">
+                            <span class="stars-text">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}</span>
                         </div>
                         <span class="review-author">${this.formatAuthor(review.authorNpub)}</span>
                         ${review.verified ? '<span class="verified-badge">⚡ Verified</span>' : ''}
@@ -511,10 +511,12 @@ class ThunderproofApp {
         document.getElementById('avg-rating').textContent = avgRating;
         document.getElementById('overall-number').textContent = avgRating;
         
-        // Update overall stars image
-        const overallStars = document.getElementById('overall-stars');
-        const ratingAsset = this.getRatingAsset(parseFloat(avgRating));
-        overallStars.src = `assets/${ratingAsset}.svg`;
+        // Update overall stars display (using text stars since images might not exist)
+        const overallStarsEl = document.getElementById('overall-stars');
+        if (overallStarsEl) {
+            const rating = Math.round(parseFloat(avgRating));
+            overallStarsEl.textContent = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+        }
 
         // Update rating breakdown
         this.updateRatingBreakdown();
@@ -786,11 +788,15 @@ class ThunderproofApp {
         
         document.querySelector(`[data-rating="${rating}"]`).classList.add('selected');
         
-        // Update selected rating display
+        // Update selected rating display with text stars
         const selectedStars = document.getElementById('selected-stars');
         const ratingText = document.getElementById('rating-text');
         
-        selectedStars.src = `assets/${this.getRatingAsset(rating)}.svg`;
+        // Use text stars since images might not exist
+        if (selectedStars) {
+            selectedStars.textContent = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+        }
+        
         ratingText.textContent = `${rating} star${rating !== 1 ? 's' : ''}`;
         
         this.validateReviewForm();
@@ -811,7 +817,10 @@ class ThunderproofApp {
             btn.classList.remove('selected');
         });
         
-        document.getElementById('selected-stars').src = 'assets/0.svg';
+        const selectedStars = document.getElementById('selected-stars');
+        if (selectedStars) {
+            selectedStars.textContent = '☆☆☆☆☆';
+        }
         document.getElementById('rating-text').textContent = 'Select your rating';
         document.getElementById('review-comment').value = '';
         document.getElementById('char-counter').textContent = '0/500 characters';
@@ -840,7 +849,7 @@ class ThunderproofApp {
         
         try {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="loading-spinner"></div> Publishing to Nostr...';
+            submitBtn.innerHTML = '⚡ Publishing to Nostr...';
             
             // Create review event
             const reviewEvent = await this.createReviewEvent(
@@ -1111,21 +1120,6 @@ class ThunderproofApp {
     // Utility functions
     isValidNpub(key) {
         return key.startsWith('npub1') && key.length === 63;
-    }
-
-    getRatingAsset(rating) {
-        const percentage = rating * 20;
-        if (percentage >= 100) return '100';
-        if (percentage >= 90) return '90';
-        if (percentage >= 80) return '80';
-        if (percentage >= 70) return '70';
-        if (percentage >= 60) return '60';
-        if (percentage >= 50) return '50';
-        if (percentage >= 40) return '40';
-        if (percentage >= 30) return '30';
-        if (percentage >= 20) return '20';
-        if (percentage >= 10) return '10';
-        return '0';
     }
 
     formatAuthor(npub) {
