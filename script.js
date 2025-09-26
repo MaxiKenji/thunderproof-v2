@@ -1,4 +1,4 @@
-// Thunderproof - Complete JavaScript Application
+// Thunderproof - Enhanced JavaScript with Real Nostr Reviews
 class ThunderproofApp {
     constructor() {
         // Application state
@@ -18,6 +18,10 @@ class ThunderproofApp {
             'wss://brb.io'
         ];
         
+        // Review event kind (using NIP-32 labeling)
+        this.REVIEW_KIND = 1985;
+        this.REVIEW_NAMESPACE = 'thunderproof';
+        
         this.init();
     }
 
@@ -35,6 +39,9 @@ class ThunderproofApp {
         
         // Setup event listeners
         this.setupEventListeners();
+        
+        // Check for saved login
+        this.checkSavedLogin();
         
         // Check URL parameters for direct profile links
         this.handleURLParams();
@@ -129,10 +136,9 @@ class ThunderproofApp {
             });
         });
 
-        // Connect options
+        // Connect options (removed generate keys)
         document.getElementById('connect-extension')?.addEventListener('click', () => this.connectExtension());
-        document.getElementById('connect-key')?.addEventListener('click', () => this.connectWithKey());
-        document.getElementById('connect-generate')?.addEventListener('click', () => this.generateKeys());
+        document.getElementById('connect-key')?.addEventListener('click', () => this.showNsecInput());
     }
 
     setupReviewForm() {
@@ -170,6 +176,40 @@ class ThunderproofApp {
         ['embed-width', 'embed-height', 'embed-max'].forEach(id => {
             document.getElementById(id)?.addEventListener('input', () => this.updateEmbedCode());
         });
+    }
+
+    checkSavedLogin() {
+        try {
+            const savedNsec = localStorage.getItem('thunderproof_nsec');
+            const savedPubkey = localStorage.getItem('thunderproof_pubkey');
+            
+            if (savedNsec && savedPubkey && this.nostr) {
+                // Restore saved login
+                const decoded = this.nostr.nip19.decode(savedNsec);
+                const privkey = decoded.data;
+                const pubkey = this.nostr.getPublicKey(privkey);
+                
+                if (pubkey === savedPubkey) {
+                    this.user = {
+                        pubkey: savedPubkey,
+                        npub: this.nostr.nip19.npubEncode(savedPubkey),
+                        privkey: privkey,
+                        nsec: savedNsec,
+                        name: savedNsec.substring(0, 16) + '...',
+                        picture: null,
+                        method: 'nsec'
+                    };
+                    
+                    this.isConnected = true;
+                    this.updateConnectionUI();
+                    console.log('✅ Restored saved login');
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to restore saved login:', error);
+            localStorage.removeItem('thunderproof_nsec');
+            localStorage.removeItem('thunderproof_pubkey');
+        }
     }
 
     handleURLParams() {
@@ -307,62 +347,127 @@ class ThunderproofApp {
     async loadReviews() {
         if (!this.currentProfile) return;
 
+        this.showLoading('Loading reviews...');
+
         try {
-            // For now, show demo reviews since Nostr review protocol needs implementation
-            this.currentReviews = this.generateDemoReviews();
+            // Load real reviews from Nostr relays
+            const reviews = await this.fetchReviewsFromRelays(this.currentProfile.pubkey);
+            this.currentReviews = reviews;
             this.displayReviews();
             this.updateProfileStats();
+            
+            console.log(`✅ Loaded ${reviews.length} reviews from Nostr`);
         } catch (error) {
             console.error('Error loading reviews:', error);
-            this.showToast('Error loading reviews', 'error');
+            this.currentReviews = [];
+            this.displayReviews();
+            this.updateProfileStats();
+            this.showToast('Error loading reviews from Nostr relays', 'error');
+        } finally {
+            this.hideLoading();
         }
     }
 
-    generateDemoReviews() {
-        const reviews = [
-            {
-                id: 'demo1',
-                author: 'npub1alice123...',
-                rating: 5,
-                content: 'Excellent Bitcoin service! Fast Lightning payments and great customer support. Highly recommended.',
-                created_at: Date.now() - (1000 * 60 * 60 * 24), // 1 day ago
-                verified: true
-            },
-            {
-                id: 'demo2', 
-                author: 'npub1bob456...',
-                rating: 4,
-                content: 'Very reliable platform. Had one minor issue but it was resolved quickly by their support team.',
-                created_at: Date.now() - (1000 * 60 * 60 * 48), // 2 days ago
-                verified: true
-            },
-            {
-                id: 'demo3',
-                author: 'npub1carol789...',
-                rating: 5,
-                content: 'Outstanding experience! This is exactly what the Bitcoin ecosystem needs. Will definitely use again.',
-                created_at: Date.now() - (1000 * 60 * 60 * 72), // 3 days ago
-                verified: false
-            },
-            {
-                id: 'demo4',
-                author: 'npub1dave012...',
-                rating: 4,
-                content: 'Good service overall. Fast transactions and the Lightning integration works perfectly.',
-                created_at: Date.now() - (1000 * 60 * 60 * 96), // 4 days ago
-                verified: true
-            },
-            {
-                id: 'demo5',
-                author: 'npub1eve345...',
-                rating: 5,
-                content: 'Perfect! Exactly what I needed for my Bitcoin business. The interface is intuitive and secure.',
-                created_at: Date.now() - (1000 * 60 * 60 * 120), // 5 days ago
-                verified: false
+    async fetchReviewsFromRelays(targetPubkey) {
+        try {
+            if (!this.nostr) {
+                throw new Error('Nostr tools not available');
             }
-        ];
 
-        return reviews.sort((a, b) => b.created_at - a.created_at);
+            const pool = new this.nostr.SimplePool();
+            
+            // Query for review events (NIP-32 labeling)
+            const filter = {
+                kinds: [this.REVIEW_KIND],
+                '#L': [this.REVIEW_NAMESPACE],    // Label namespace
+                '#l': ['review'],                 // Label type
+                '#p': [targetPubkey],            // Target pubkey being reviewed
+                limit: 100
+            };
+
+            console.log('🔍 Querying relays for reviews...', filter);
+
+            // Add timeout
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Reviews fetch timeout')), 15000)
+            );
+
+            const queryPromise = pool.querySync(this.relays, filter);
+            const events = await Promise.race([queryPromise, timeoutPromise]);
+            
+            pool.close(this.relays);
+
+            console.log(`📥 Found ${events.length} review events`);
+
+            // Process and validate review events
+            const reviews = [];
+            
+            for (const event of events) {
+                try {
+                    const review = await this.processReviewEvent(event);
+                    if (review) {
+                        reviews.push(review);
+                    }
+                } catch (error) {
+                    console.warn('Failed to process review event:', error);
+                }
+            }
+
+            // Sort by creation date (newest first)
+            reviews.sort((a, b) => b.created_at - a.created_at);
+            
+            return reviews;
+        } catch (error) {
+            console.error('Error fetching reviews from relays:', error);
+            return [];
+        }
+    }
+
+    async processReviewEvent(event) {
+        try {
+            // Verify event signature
+            if (!this.nostr.verifySignature(event)) {
+                console.warn('Invalid review event signature:', event.id);
+                return null;
+            }
+
+            // Extract review data from tags
+            const ratingTag = event.tags.find(tag => tag[0] === 'rating');
+            const targetTag = event.tags.find(tag => tag[0] === 'p');
+            const namespaceTag = event.tags.find(tag => tag[0] === 'L' && tag[1] === this.REVIEW_NAMESPACE);
+            const typeTag = event.tags.find(tag => tag[0] === 'l' && tag[1] === 'review');
+
+            // Validate required tags
+            if (!ratingTag || !targetTag || !namespaceTag || !typeTag) {
+                console.warn('Missing required review tags:', event.id);
+                return null;
+            }
+
+            const rating = parseInt(ratingTag[1]);
+            if (rating < 1 || rating > 5) {
+                console.warn('Invalid rating value:', rating);
+                return null;
+            }
+
+            // Get author npub
+            const authorNpub = this.nostr.nip19.npubEncode(event.pubkey);
+
+            return {
+                id: event.id,
+                target: targetTag[1],
+                author: event.pubkey,
+                authorNpub: authorNpub,
+                rating: rating,
+                content: event.content,
+                created_at: event.created_at,
+                verified: false, // TODO: Implement Lightning verification
+                signature: event.sig,
+                rawEvent: event
+            };
+        } catch (error) {
+            console.error('Error processing review event:', error);
+            return null;
+        }
     }
 
     displayReviews() {
@@ -385,7 +490,7 @@ class ThunderproofApp {
                         <div class="review-rating">
                             <img src="assets/${this.getRatingAsset(review.rating)}.svg" alt="${review.rating} stars">
                         </div>
-                        <span class="review-author">${this.formatAuthor(review.author)}</span>
+                        <span class="review-author">${this.formatAuthor(review.authorNpub)}</span>
                         ${review.verified ? '<span class="verified-badge">⚡ Verified</span>' : ''}
                     </div>
                     <span class="review-date">${this.formatDate(review.created_at)}</span>
@@ -487,21 +592,104 @@ class ThunderproofApp {
         }
     }
 
-    async connectWithKey() {
-        // This would show a form for manual nsec input
-        this.showToast('Manual key input coming soon. Please use a Nostr extension for now.', 'warning');
+    showNsecInput() {
+        // Update modal content to show nsec input form
+        const modalBody = document.querySelector('#connect-modal .modal-body');
+        
+        modalBody.innerHTML = `
+            <div class="nsec-input-form">
+                <h4 style="color: var(--text-primary); margin-bottom: var(--space-md);">Enter Private Key</h4>
+                <p style="color: var(--text-secondary); margin-bottom: var(--space-lg); font-size: var(--font-size-sm);">
+                    Your private key (nsec) will be stored locally and never sent to any server.
+                </p>
+                
+                <div style="margin-bottom: var(--space-lg);">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: var(--space-sm); font-weight: 600;">
+                        Private Key (nsec):
+                    </label>
+                    <input 
+                        type="password" 
+                        id="nsec-input" 
+                        placeholder="nsec1..."
+                        style="width: 100%; background: var(--dark-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: var(--space-md); color: var(--text-primary); font-family: 'Monaco', 'Consolas', monospace; font-size: var(--font-size-sm);"
+                    >
+                    <div style="margin-top: var(--space-sm);">
+                        <small style="color: var(--text-muted);">
+                            ⚠️ Make sure you trust this device. Your key will be saved locally for convenience.
+                        </small>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                    <button id="nsec-cancel" class="btn-secondary">Cancel</button>
+                    <button id="nsec-connect" class="btn-primary">Connect</button>
+                </div>
+                
+                <div id="nsec-error" style="margin-top: var(--space-md); padding: var(--space-md); background: rgba(220, 53, 69, 0.1); border: 1px solid var(--error); border-radius: var(--radius-md); color: var(--error); display: none;">
+                </div>
+            </div>
+        `;
+        
+        // Add event listeners
+        document.getElementById('nsec-cancel').addEventListener('click', () => {
+            this.hideModal(document.getElementById('connect-modal'));
+        });
+        
+        document.getElementById('nsec-connect').addEventListener('click', () => {
+            this.connectWithNsec();
+        });
+        
+        // Enter key support
+        document.getElementById('nsec-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.connectWithNsec();
+            }
+        });
+        
+        // Focus on input
+        setTimeout(() => {
+            document.getElementById('nsec-input').focus();
+        }, 100);
     }
 
-    async generateKeys() {
+    async connectWithNsec() {
+        const nsecInput = document.getElementById('nsec-input');
+        const errorDiv = document.getElementById('nsec-error');
+        const nsec = nsecInput.value.trim();
+        
+        // Hide previous errors
+        errorDiv.style.display = 'none';
+        
+        if (!nsec) {
+            this.showNsecError('Please enter your private key');
+            return;
+        }
+        
+        if (!nsec.startsWith('nsec1')) {
+            this.showNsecError('Private key must start with "nsec1"');
+            return;
+        }
+        
         try {
+            this.showLoading('Verifying private key...');
+            
             if (!this.nostr) {
                 throw new Error('Nostr tools not available');
             }
-
-            const privkey = this.nostr.generatePrivateKey();
+            
+            // Decode and validate nsec
+            const decoded = this.nostr.nip19.decode(nsec);
+            if (decoded.type !== 'nsec') {
+                throw new Error('Invalid private key format');
+            }
+            
+            const privkey = decoded.data;
             const pubkey = this.nostr.getPublicKey(privkey);
-            const nsec = this.nostr.nip19.nsecEncode(privkey);
             const npub = this.nostr.nip19.npubEncode(pubkey);
+            
+            // Save to localStorage
+            localStorage.setItem('thunderproof_nsec', nsec);
+            localStorage.setItem('thunderproof_pubkey', pubkey);
             
             this.user = {
                 pubkey,
@@ -510,38 +698,33 @@ class ThunderproofApp {
                 nsec,
                 name: npub.substring(0, 16) + '...',
                 picture: null,
-                method: 'generated'
+                method: 'nsec'
             };
             
             this.isConnected = true;
             this.updateConnectionUI();
             this.hideModal(document.getElementById('connect-modal'));
-            
-            this.showToast('New keys generated! Save your private key safely.', 'success');
-            
-            // Show generated keys to user
-            this.showGeneratedKeysInfo(nsec, npub);
+            this.showToast('Connected with private key!', 'success');
             
         } catch (error) {
-            console.error('Key generation error:', error);
-            this.showToast('Failed to generate keys', 'error');
+            console.error('Nsec connection error:', error);
+            this.showNsecError(error.message || 'Invalid private key');
+        } finally {
+            this.hideLoading();
         }
     }
 
-    showGeneratedKeysInfo(nsec, npub) {
-        // Simple alert for now - could be enhanced with a proper modal
-        const message = `🔑 Your new Nostr keys:\n\nPublic key (share this):\n${npub}\n\nPrivate key (keep this secret!):\n${nsec}\n\n⚠️ Save your private key safely - you'll need it to access this identity again!`;
-        
-        setTimeout(() => {
-            if (confirm(message + '\n\nClick OK to copy your private key to clipboard.')) {
-                navigator.clipboard.writeText(nsec).catch(() => {
-                    console.warn('Failed to copy to clipboard');
-                });
-            }
-        }, 1000);
+    showNsecError(message) {
+        const errorDiv = document.getElementById('nsec-error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
     }
 
     disconnect() {
+        // Clear saved data
+        localStorage.removeItem('thunderproof_nsec');
+        localStorage.removeItem('thunderproof_pubkey');
+        
         this.user = null;
         this.isConnected = false;
         this.updateConnectionUI();
@@ -657,34 +840,120 @@ class ThunderproofApp {
         
         try {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="loading-spinner"></span> Publishing...';
+            submitBtn.innerHTML = '<div class="loading-spinner"></div> Publishing to Nostr...';
             
-            // Simulate review submission (real implementation would publish to Nostr)
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Create review event
+            const reviewEvent = await this.createReviewEvent(
+                this.currentProfile.pubkey,
+                this.selectedRating,
+                comment
+            );
             
-            // Add review to current list for demo
-            const newReview = {
-                id: 'user_' + Date.now(),
-                author: this.user.npub,
-                rating: this.selectedRating,
-                content: comment,
-                created_at: Date.now(),
-                verified: false
-            };
-            
-            this.currentReviews.unshift(newReview);
-            this.displayReviews();
-            this.updateProfileStats();
+            // Publish to relays
+            await this.publishReviewEvent(reviewEvent);
             
             this.hideModal(document.getElementById('review-modal'));
-            this.showToast('Review published successfully!', 'success');
+            this.showToast('Review published to Nostr relays!', 'success');
+            
+            // Reload reviews after a short delay to allow propagation
+            setTimeout(() => {
+                this.loadReviews();
+            }, 2000);
             
         } catch (error) {
             console.error('Submit review error:', error);
-            this.showToast('Failed to publish review', 'error');
+            this.showToast(`Failed to publish review: ${error.message}`, 'error');
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = originalText;
+        }
+    }
+
+    async createReviewEvent(targetPubkey, rating, content) {
+        if (!this.nostr || !this.user) {
+            throw new Error('Nostr tools or user not available');
+        }
+
+        // Create NIP-32 labeling event for review
+        const event = {
+            kind: this.REVIEW_KIND,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [
+                ['L', this.REVIEW_NAMESPACE],              // Label namespace
+                ['l', 'review', this.REVIEW_NAMESPACE],    // Label type with namespace
+                ['p', targetPubkey],                       // Target pubkey being reviewed
+                ['rating', rating.toString()],             // Rating value (1-5)
+                ['client', 'Thunderproof']                 // Client tag
+            ],
+            content: content,
+            pubkey: this.user.pubkey
+        };
+
+        // Sign the event
+        if (this.user.method === 'extension' && window.nostr) {
+            // Use extension signing
+            return await window.nostr.signEvent(event);
+        } else if (this.user.method === 'nsec' && this.user.privkey) {
+            // Use local private key
+            return this.nostr.finishEvent(event, this.user.privkey);
+        } else {
+            throw new Error('No signing method available');
+        }
+    }
+
+    async publishReviewEvent(signedEvent) {
+        console.log('📤 Publishing review event:', signedEvent);
+        
+        const pool = new this.nostr.SimplePool();
+        
+        try {
+            // Publish to all relays
+            const publishPromises = this.relays.map(async (relay) => {
+                try {
+                    console.log(`📡 Publishing to ${relay}...`);
+                    const pub = pool.publish([relay], signedEvent);
+                    
+                    // Wait for confirmation or timeout
+                    return new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error(`Timeout publishing to ${relay}`));
+                        }, 10000);
+                        
+                        pub.on('ok', () => {
+                            clearTimeout(timeout);
+                            console.log(`✅ Published to ${relay}`);
+                            resolve(relay);
+                        });
+                        
+                        pub.on('failed', (reason) => {
+                            clearTimeout(timeout);
+                            console.warn(`❌ Failed to publish to ${relay}:`, reason);
+                            reject(new Error(`Failed to publish to ${relay}: ${reason}`));
+                        });
+                    });
+                } catch (error) {
+                    console.warn(`❌ Error publishing to ${relay}:`, error);
+                    throw error;
+                }
+            });
+
+            // Wait for all attempts to complete
+            const results = await Promise.allSettled(publishPromises);
+            
+            // Count successful publications
+            const successful = results.filter(result => result.status === 'fulfilled');
+            const failed = results.filter(result => result.status === 'rejected');
+            
+            console.log(`📊 Publication results: ${successful.length} successful, ${failed.length} failed`);
+            
+            if (successful.length === 0) {
+                throw new Error('Failed to publish to any relay');
+            }
+            
+            console.log(`✅ Review published to ${successful.length}/${this.relays.length} relays`);
+            
+        } finally {
+            pool.close(this.relays);
         }
     }
 
@@ -868,7 +1137,7 @@ class ThunderproofApp {
     }
 
     formatDate(timestamp) {
-        const date = new Date(timestamp);
+        const date = new Date(timestamp * 1000); // Nostr timestamps are in seconds
         const now = new Date();
         const diffTime = Math.abs(now - date);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

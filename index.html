@@ -76,7 +76,7 @@
                         <div class="example-buttons">
                             <button class="example-btn" data-npub="npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m">Jack Dorsey</button>
                             <button class="example-btn" data-npub="npub15dqlghlewk84wz3pkqqvzl2w2w36f97g89ljds8x6c094nlu02vqjllm5m">Matt Odell</button>
-                            <button class="example-btn" data-npub="npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx">fiatjaf</button>
+                            <button class="example-btn" data-npub="npub104fpzfgtc4h272p66uye2nhjes622x7dduk97g8re5h8gmmv2pnsqdq2a2">MaxiKenji</button>
                         </div>
                     </div>
                 </div>
@@ -252,7 +252,7 @@
                 <div class="step">
                     <div class="step-number">2</div>
                     <h3>Connect Nostr</h3>
-                    <p>Login with your Nostr account using extensions like Alby, nos2x, or Primal</p>
+                    <p>Login with your Nostr account using extensions like Alby, nos2x, or private key</p>
                 </div>
                 
                 <div class="step">
@@ -454,14 +454,13 @@
                             <p>Enter your nsec private key manually (stored locally)</p>
                         </div>
                     </button>
-                    
-                    <button class="connect-option" id="connect-generate">
-                        <div class="option-icon">✨</div>
-                        <div class="option-info">
-                            <h4>Generate New Keys</h4>
-                            <p>Create a new Nostr identity for testing</p>
-                        </div>
-                    </button>
+                </div>
+                
+                <div style="margin-top: var(--space-lg); padding: var(--space-md); background: rgba(247, 147, 26, 0.1); border: 1px solid var(--primary-orange); border-radius: var(--radius-md);">
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0;">
+                        <strong style="color: var(--primary-orange);">🔒 Security:</strong> 
+                        Your private keys never leave your device. Extension login is recommended for best security.
+                    </p>
                 </div>
             </div>
         </div>
@@ -477,6 +476,6 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- JavaScript -->
-    <script src="script.js"></script>
+    <script src="script-enhanced.js"></script>
 </body>
 </html>
