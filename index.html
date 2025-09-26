@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thunderproof - Nostr Review System</title>
+    <meta name="description" content="Decentralized review system built on Nostr protocol for authentic Bitcoin ecosystem feedback">
+    
+    <!-- Source Sans 3 Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Nostr Tools -->
+    <script type="module" src="https://unpkg.com/nostr-tools@2.7.2/lib/esm/index.js" id="nostr-tools"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <img src="assets/logo.svg" alt="Thunderproof Logo" class="logo">
+                <div class="brand-text">
+                    <span class="brand-name">Thunderproof</span>
+                    <span class="brand-tagline">proof of trust</span>
+                </div>
+            </div>
+            
+            <div class="nav-actions">
+                <button id="connect-btn" class="btn-connect">
+                    <span class="btn-icon">⚡</span>
+                    Connect Nostr
+                </button>
+                <div id="user-info" class="user-info hidden">
+                    <img id="user-avatar" src="" alt="User" class="user-avatar">
+                    <span id="user-name" class="user-name">Anonymous</span>
+                    <button id="disconnect-btn" class="btn-disconnect">Disconnect</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    Authentic Reviews for the <span class="highlight">Bitcoin Ecosystem</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Discover and share verified reviews using the Nostr protocol. 
+                    No fake reviews, no manipulation, just proof of trust.
+                </p>
+                
+                <div class="search-section">
+                    <div class="search-box">
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            class="search-input" 
+                            placeholder="Enter Nostr public key (npub1...)"
+                            spellcheck="false"
+                            autocomplete="off"
+                        >
+                        <button id="search-btn" class="search-btn">
+                            <span class="search-icon">🔍</span>
+                            Search
+                        </button>
+                    </div>
+                    
+                    <div class="search-examples">
+                        <span class="examples-label">Try examples:</span>
+                        <div class="example-buttons">
+                            <button class="example-btn" data-npub="npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m">Jack Dorsey</button>
+                            <button class="example-btn" data-npub="npub15dqlghlewk84wz3pkqqvzl2w2w36f97g89ljds8x6c094nlu02vqjllm5m">Matt Odell</button>
+                            <button class="example-btn" data-npub="npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx">fiatjaf</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hero-visual">
+                <div class="floating-reviews">
+                    <div class="review-card r1">
+                        <div class="review-stars">
+                            <img src="assets/100.svg" alt="5 stars" class="stars">
+                        </div>
+                        <p>"Excellent Bitcoin service!"</p>
+                        <div class="review-author">⚡ Verified</div>
+                    </div>
+                    <div class="review-card r2">
+                        <div class="review-stars">
+                            <img src="assets/80.svg" alt="4 stars" class="stars">
+                        </div>
+                        <p>"Fast Lightning payments"</p>
+                        <div class="review-author">⚡ Verified</div>
+                    </div>
+                    <div class="review-card r3">
+                        <div class="review-stars">
+                            <img src="assets/90.svg" alt="4.5 stars" class="stars">
+                        </div>
+                        <p>"Secure and reliable"</p>
+                        <div class="review-author">⚡ Verified</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Profile Results Section -->
+    <section id="profile-section" class="profile-section hidden">
+        <div class="container">
+            <button id="back-btn" class="back-btn">
+                <span>←</span> Back to Search
+            </button>
+            
+            <div class="profile-card">
+                <div class="profile-header">
+                    <img id="profile-avatar" src="" alt="Profile" class="profile-avatar">
+                    <div class="profile-info">
+                        <h2 id="profile-name" class="profile-name">Loading...</h2>
+                        <p id="profile-about" class="profile-about">Loading profile information...</p>
+                        <div class="profile-meta">
+                            <span id="profile-npub" class="profile-npub">npub...</span>
+                            <div class="profile-stats">
+                                <div class="stat">
+                                    <span id="total-reviews" class="stat-number">0</span>
+                                    <span class="stat-label">Reviews</span>
+                                </div>
+                                <div class="stat">
+                                    <span id="avg-rating" class="stat-number">0.0</span>
+                                    <span class="stat-label">Average</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="profile-actions">
+                    <button id="add-review-btn" class="btn-primary" disabled>
+                        <span class="btn-icon">✍️</span>
+                        Add Review
+                    </button>
+                    <button id="share-btn" class="btn-secondary">
+                        <span class="btn-icon">📤</span>
+                        Share Reviews
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Overall Rating Display -->
+            <div class="rating-overview">
+                <div class="rating-summary">
+                    <div class="rating-display">
+                        <img id="overall-stars" src="assets/0.svg" alt="Overall rating" class="overall-stars">
+                        <div class="rating-number" id="overall-number">0.0</div>
+                        <div class="rating-label">out of 5 stars</div>
+                    </div>
+                </div>
+                <div id="rating-breakdown" class="rating-breakdown">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Reviews List -->
+            <div class="reviews-section">
+                <div class="reviews-header">
+                    <h3>Reviews</h3>
+                    <select id="sort-reviews" class="sort-select">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="highest">Highest Rating</option>
+                        <option value="lowest">Lowest Rating</option>
+                    </select>
+                </div>
+                
+                <div id="reviews-list" class="reviews-list">
+                    <!-- Reviews will be populated here -->
+                </div>
+                
+                <div id="no-reviews" class="no-reviews">
+                    <div class="empty-icon">📝</div>
+                    <h4>No reviews yet</h4>
+                    <p>Be the first to review this profile!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="about-section">
+        <div class="container">
+            <h2>Why Thunderproof?</h2>
+            <p class="section-subtitle">Built on Nostr protocol for censorship-resistant, authentic reviews</p>
+            
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Decentralized</h3>
+                    <p>Reviews stored on Nostr relays, not controlled by any single entity</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Verified</h3>
+                    <p>Reviewers verified through Lightning activity to prevent fake reviews</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Cryptographically Signed</h3>
+                    <p>Every review is signed with Nostr keys - impossible to fake or manipulate</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🔗</div>
+                    <h3>Embeddable</h3>
+                    <p>Share profiles or embed review widgets on any website</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Bitcoin Focused</h3>
+                    <p>Designed specifically for Bitcoin and Lightning ecosystem services</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">📱</div>
+                    <h3>Easy to Use</h3>
+                    <p>Simple interface powered by Nostr wallet extensions</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="how-section">
+        <div class="container">
+            <h2>How It Works</h2>
+            <p class="section-subtitle">Four simple steps to authentic reviews</p>
+            
+            <div class="steps-grid">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Search Profile</h3>
+                    <p>Enter any Nostr public key (npub) to find a profile and see existing reviews</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Connect Nostr</h3>
+                    <p>Login with your Nostr account using extensions like Alby, nos2x, or Primal</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Leave Review</h3>
+                    <p>Rate your experience with 1-5 stars and write detailed feedback</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Share & Embed</h3>
+                    <p>Your review is published to Nostr relays and can be shared anywhere</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <img src="assets/logo.svg" alt="Thunderproof" class="footer-logo">
+                    <div class="footer-text">
+                        <span class="footer-name">Thunderproof</span>
+                        <span class="footer-tagline">Proof of trust on Nostr</span>
+                    </div>
+                </div>
+                
+                <div class="footer-links">
+                    <div class="link-group">
+                        <h4>Product</h4>
+                        <a href="#features">Features</a>
+                        <a href="#how-it-works">How it Works</a>
+                        <a href="https://github.com/MaxiKenji/thunderproof-v2" target="_blank">GitHub</a>
+                    </div>
+                    
+                    <div class="link-group">
+                        <h4>Protocol</h4>
+                        <a href="https://nostr.com" target="_blank">About Nostr</a>
+                        <a href="https://lightning.network" target="_blank">Lightning Network</a>
+                        <a href="https://bitcoin.org" target="_blank">Bitcoin</a>
+                    </div>
+                    
+                    <div class="link-group">
+                        <h4>Community</h4>
+                        <a href="https://nostr.band" target="_blank">Nostr.band</a>
+                        <a href="https://stacker.news" target="_blank">Stacker News</a>
+                        <a href="https://snort.social" target="_blank">Snort</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2025 Thunderproof. Built on Nostr protocol for the Bitcoin community.</p>
+                <div class="footer-social">
+                    <a href="#" class="social-link">⚡</a>
+                    <a href="#" class="social-link">₿</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Add Review Modal -->
+    <div id="review-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Review</h3>
+                <button class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="rating-selector">
+                    <label>Your Rating</label>
+                    <div class="star-buttons">
+                        <button class="star-btn" data-rating="1">
+                            <img src="assets/20.svg" alt="1 star" class="star-img">
+                            <span>1 star</span>
+                        </button>
+                        <button class="star-btn" data-rating="2">
+                            <img src="assets/40.svg" alt="2 stars" class="star-img">
+                            <span>2 stars</span>
+                        </button>
+                        <button class="star-btn" data-rating="3">
+                            <img src="assets/60.svg" alt="3 stars" class="star-img">
+                            <span>3 stars</span>
+                        </button>
+                        <button class="star-btn" data-rating="4">
+                            <img src="assets/80.svg" alt="4 stars" class="star-img">
+                            <span>4 stars</span>
+                        </button>
+                        <button class="star-btn" data-rating="5">
+                            <img src="assets/100.svg" alt="5 stars" class="star-img">
+                            <span>5 stars</span>
+                        </button>
+                    </div>
+                    
+                    <div class="selected-rating">
+                        <img id="selected-stars" src="assets/0.svg" alt="Selected rating" class="selected-stars-img">
+                        <span id="rating-text">Select your rating</span>
+                    </div>
+                </div>
+                
+                <div class="comment-section">
+                    <label for="review-comment">Your Review</label>
+                    <textarea 
+                        id="review-comment" 
+                        placeholder="Share your experience with this profile..."
+                        rows="4"
+                        maxlength="500"
+                    ></textarea>
+                    <div class="comment-info">
+                        <span id="char-counter">0/500 characters</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancel-review">Cancel</button>
+                <button class="btn-primary" id="submit-review" disabled>
+                    <span class="btn-icon">📝</span>
+                    Publish Review
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Share Reviews</h3>
+                <button class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="share-section">
+                    <h4>Direct Link</h4>
+                    <p>Share this profile's reviews with a direct link</p>
+                    <div class="url-group">
+                        <input type="text" id="share-url" readonly class="url-input">
+                        <button class="btn-copy" id="copy-url">Copy</button>
+                    </div>
+                </div>
+                
+                <div class="share-section">
+                    <h4>Embed Widget</h4>
+                    <p>Add these reviews to your website</p>
+                    
+                    <div class="embed-settings">
+                        <div class="setting-row">
+                            <label>Width (px):</label>
+                            <input type="number" id="embed-width" value="400" min="300" max="800">
+                        </div>
+                        <div class="setting-row">
+                            <label>Height (px):</label>
+                            <input type="number" id="embed-height" value="500" min="300" max="800">
+                        </div>
+                        <div class="setting-row">
+                            <label>Max Reviews:</label>
+                            <input type="number" id="embed-max" value="5" min="1" max="20">
+                        </div>
+                    </div>
+                    
+                    <div class="url-group">
+                        <textarea id="embed-code" readonly rows="4" class="embed-textarea"></textarea>
+                        <button class="btn-copy" id="copy-embed">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal -->
+    <div id="connect-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Connect to Nostr</h3>
+                <button class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="connect-options">
+                    <button class="connect-option primary" id="connect-extension">
+                        <div class="option-icon">🔌</div>
+                        <div class="option-info">
+                            <h4>Nostr Extension</h4>
+                            <p>Connect using Alby, nos2x, or another NIP-07 extension</p>
+                        </div>
+                    </button>
+                    
+                    <button class="connect-option" id="connect-key">
+                        <div class="option-icon">🔑</div>
+                        <div class="option-info">
+                            <h4>Private Key</h4>
+                            <p>Enter your nsec private key manually (stored locally)</p>
+                        </div>
+                    </button>
+                    
+                    <button class="connect-option" id="connect-generate">
+                        <div class="option-icon">✨</div>
+                        <div class="option-info">
+                            <h4>Generate New Keys</h4>
+                            <p>Create a new Nostr identity for testing</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading...</div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
